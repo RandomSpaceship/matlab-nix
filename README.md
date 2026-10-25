@@ -163,6 +163,10 @@ CI ([check.yml](.github/workflows/check.yml)) builds the package and runs
 and the formatting (`nix fmt`). CI cannot install MATLAB. Thus only a manual test
 shows that MATLAB runs.
 
+## Development
+
+Developed using Claude Code and Opus 5.5.
+
 ## Prior work
 
 - [doronbehar/nix-matlab](https://gitlab.com/doronbehar/nix-matlab) (archived): the
