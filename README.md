@@ -10,10 +10,10 @@ Nix store. This flake gives the [`buildFHSEnv`](https://nixos.org/manual/nixpkgs
 environment that MATLAB and its installer run in. It also gives launchers that find the
 installation. This repository does not include or redistribute files from MathWorks.
 
-The packages in the environment follow the MathWorks dependency list for R2026b
+The packages in the environment follow the MathWorks dependency list for each release
 ([container-images](https://github.com/mathworks-ref-arch/container-images),
-`matlab-deps/r2026b/ubuntu24.04`). [fhs-packages.nix](fhs-packages.nix) maps that list
-to nixpkgs.
+`matlab-deps/<release>/ubuntu24.04`). A script changes these lists to Nix files for
+R2023a to R2026b. See [deps/README.md](deps/README.md).
 
 ## Install MATLAB
 
@@ -69,7 +69,14 @@ nothing until you set `programs.matlab.enable`.
 - `programs.matlab.installDir`: the absolute path of the installation directory. The
   default is `~/.local/share/matlab/R2026b` of the user that runs MATLAB. `MATLAB_ROOT`
   overrides this option.
+- `programs.matlab.release`: the MATLAB release, for example `"R2025b"`. This option
+  sets the default installation directory, the messages, and the name of the desktop
+  entry. It also selects the dependency list. The default is the release of the
+  package (R2026b). The releases from R2023a to R2026b have a list, but only R2026b is
+  tested with a real installation.
 - `programs.matlab.package`: replaces the package.
+
+Without the modules, use `matlab.packages.x86_64-linux.matlab.override { release = "R2025b"; }`.
 
 ```nix
 {

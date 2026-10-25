@@ -23,6 +23,17 @@ in
       description = "The MATLAB package (the launchers; MATLAB itself is installed with `matlab-install`).";
     };
 
+    release = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "R2025b";
+      description = ''
+        The MATLAB release, for the default installation directory, the
+        messages and the desktop entry. The default (null) is the release of
+        the package. Only the default release of the package is tested.
+      '';
+    };
+
     installDir = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -35,9 +46,15 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable (
-    lib.setAttrByPath packagesOption [
-      (if cfg.installDir == null then cfg.package else cfg.package.override { inherit (cfg) installDir; })
-    ]
-  );
+  config =
+    let
+      # Only the options that are set, so that a package without these
+      # arguments still works with the defaults.
+      overrides = lib.filterAttrs (_: value: value != null) { inherit (cfg) release installDir; };
+    in
+    lib.mkIf cfg.enable (
+      lib.setAttrByPath packagesOption [
+        (if overrides == { } then cfg.package else cfg.package.override overrides)
+      ]
+    );
 }

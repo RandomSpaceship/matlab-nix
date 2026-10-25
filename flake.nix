@@ -50,6 +50,21 @@
             type = "app";
             program = "${matlab}/bin/matlab-shell";
           };
+          # Makes deps/<release>.nix again from MathWorks' lists (see
+          # deps/README.md). Run it from the root of the repository.
+          update-deps = {
+            type = "app";
+            program = pkgs.lib.getExe (
+              pkgs.writeShellApplication {
+                name = "update-deps";
+                runtimeInputs = [
+                  pkgs.python3
+                  pkgs.nixfmt
+                ];
+                text = ''exec python3 -I ${./deps/update-deps.py} "$@"'';
+              }
+            );
+          };
         }
       );
 
@@ -62,10 +77,12 @@
           inherit (self.packages.${system}) matlab;
           inherit (nixpkgs) lib;
 
+          # Not the default release, so that the check sees the override.
           settings = {
             programs.matlab = {
               enable = true;
-              installDir = "/opt/MATLAB/R2026b";
+              release = "R2025b";
+              installDir = "/opt/matlab-test";
             };
           };
 
@@ -111,12 +128,33 @@
           inherit matlab;
 
           module =
-            assert (installedMatlab nixos.environment.systemPackages).installDir == "/opt/MATLAB/R2026b";
-            assert (installedMatlab home.home.packages).installDir == "/opt/MATLAB/R2026b";
-            pkgs.writeText "check-module" "ok";
+            let
+              fromNixos = installedMatlab nixos.environment.systemPackages;
+              fromHome = installedMatlab home.home.packages;
+            in
+            assert fromNixos.installDir == "/opt/matlab-test" && fromNixos.release == "R2025b";
+            assert fromHome.installDir == "/opt/matlab-test" && fromHome.release == "R2025b";
+            pkgs.runCommand "check-module" { } ''
+              grep -qx 'Name=MATLAB R2025b' ${fromNixos}/share/applications/matlab.desktop
+              grep -qx 'StartupWMClass=MATLAB R2025b' ${fromNixos}/share/applications/matlab.desktop
+              grep -q "/opt/matlab-test" ${fromNixos}/bin/matlab
+              grep -q "no MATLAB R2025b installation" ${fromNixos}/bin/matlab
+              touch $out
+            '';
+
+          # The package list of every release in deps/ evaluates (each
+          # attribute is in nixpkgs). Only the default release is built.
+          deps =
+            let
+              releases = map (name: "R" + lib.removePrefix "r" (lib.removeSuffix ".nix" name)) (
+                lib.filter (lib.hasPrefix "r20") (lib.attrNames (builtins.readDir ./deps))
+              );
+              envs = map (release: (matlab.override { inherit release; }).env.drvPath) releases;
+            in
+            builtins.deepSeq envs (pkgs.writeText "check-deps" (lib.concatLines releases));
 
           format = pkgs.runCommand "check-format" { nativeBuildInputs = [ pkgs.nixfmt ]; } ''
-            nixfmt --check ${./.}/*.nix
+            nixfmt --check ${./.}/*.nix ${./.}/deps/*.nix
             touch $out
           '';
         }

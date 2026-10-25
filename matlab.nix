@@ -7,6 +7,9 @@
   makeDesktopItem,
   unzip,
   gperftools,
+  # The MATLAB release, which picks deps/<release>.nix. Only the default
+  # release is tested with a real installation.
+  release ? "R2026b",
   # The installation directory, instead of ~/.local/share/matlab/<release>.
   installDir ? null,
 }:
@@ -16,8 +19,6 @@
 # machine), into a user-writable directory outside the store. This package is
 # the FHS environment it runs in, and the commands that find that directory.
 let
-  release = "R2026b";
-
   defaultRoot =
     if installDir == null then
       "\"\${XDG_DATA_HOME:-$HOME/.local/share}/matlab/${release}\""
@@ -52,7 +53,7 @@ let
 
   env = buildFHSEnv {
     name = "matlab-env";
-    targetPkgs = import ./fhs-packages.nix;
+    targetPkgs = import ./fhs-packages.nix { inherit lib release; };
     profile = ''
       export LANG="''${LANG:-en_US.UTF-8}"
     '';
