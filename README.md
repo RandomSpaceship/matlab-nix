@@ -1,42 +1,49 @@
 # MATLAB for NixOS
 
-Nix flake that runs [MATLAB](https://www.mathworks.com/products/matlab.html) R2026b on
+This Nix flake runs [MATLAB](https://www.mathworks.com/products/matlab.html) R2026b on
 NixOS (`x86_64-linux`).
 
-MATLAB can't be packaged in the usual way: its installer needs your MathWorks login,
-downloads the products your licence covers, and activates them for this machine. So
-MATLAB is installed imperatively, into a user-writable directory outside the store,
-and this flake provides the [`buildFHSEnv`](https://nixos.org/manual/nixpkgs/unstable/#sec-fhs-environments)
-environment it (and its installer) runs in, plus launchers that find the installation.
-Nothing from MathWorks is included or redistributed here.
+You cannot package MATLAB in the usual way. Its installer needs your MathWorks login.
+It downloads the products that your licence covers, and it activates them for this
+machine. Thus you install MATLAB yourself, into a user-writable directory outside the
+Nix store. This flake gives the [`buildFHSEnv`](https://nixos.org/manual/nixpkgs/unstable/#sec-fhs-environments)
+environment that MATLAB and its installer run in. It also gives launchers that find the
+installation. This repository does not include or redistribute files from MathWorks.
 
-The environment's packages follow MathWorks' own dependency list for R2026b
+The packages in the environment follow the MathWorks dependency list for R2026b
 ([container-images](https://github.com/mathworks-ref-arch/container-images),
-`matlab-deps/r2026b/ubuntu24.04`), mapped to nixpkgs in [fhs-packages.nix](fhs-packages.nix).
+`matlab-deps/r2026b/ubuntu24.04`). [fhs-packages.nix](fhs-packages.nix) maps that list
+to nixpkgs.
 
-## Installing MATLAB
+## Install MATLAB
 
-Download the Linux installer (`matlab_R2026b_Linux.zip`) from your
-[MathWorks account](https://www.mathworks.com/downloads/), then run it in the environment:
+1. Download the Linux installer (`matlab_R2026b_Linux.zip`) from your
+   [MathWorks account](https://www.mathworks.com/downloads/).
+2. Run the installer in the environment:
 
-```sh
-nix run github:RandomSpaceship/matlab-nix#install -- matlab_R2026b_Linux.zip
-```
+   ```sh
+   nix run github:RandomSpaceship/matlab-nix#install -- matlab_R2026b_Linux.zip
+   ```
 
-It extracts the zip to a temporary directory (an already extracted directory works
-too) and starts the installer. Sign in, pick your products, and when asked for the
-destination folder, choose the one it printed:
+   The command extracts the zip file to a temporary directory and starts the
+   installer. You can also give it a directory that you extracted before.
+3. Sign in, and select your products.
+4. When the installer asks for the destination, select the directory that the command
+   showed:
 
-```
-~/.local/share/matlab/R2026b
-```
+   ```
+   ~/.local/share/matlab/R2026b
+   ```
 
-The installer suggests `/usr/local/MATLAB/R2026b`, which isn't writable on NixOS.
-Leave "create symbolic links" unticked; the flake's `matlab` command does that job.
+   Do not use the directory that the installer suggests (`/usr/local/MATLAB/R2026b`).
+   You cannot write to it on NixOS.
+5. Do not select "create symbolic links". The `matlab` command of this flake does that
+   job.
 
-`MATLAB_ROOT` (or the modules' `installDir`) changes the folder.
+To use a different installation directory, set `MATLAB_ROOT`, or set `installDir` in
+the modules.
 
-## Running MATLAB
+## Run MATLAB
 
 ```sh
 nix run github:RandomSpaceship/matlab-nix               # the desktop
@@ -44,23 +51,24 @@ nix run github:RandomSpaceship/matlab-nix -- -batch "disp(version)"
 nix run github:RandomSpaceship/matlab-nix#shell         # bash in the environment
 ```
 
-The first start asks you to sign in again (online licensing). All of MATLAB's own
-command-line options pass through.
+At the first start, MATLAB asks you to sign in again (online licensing). The launcher
+passes all MATLAB command-line options through.
 
-`matlab-shell` (the `shell` app) is a bash in the same environment with
-`MATLAB_ROOT` set and MATLAB's `bin` on `PATH`, for `mex`, `mlint`, the MATLAB Engine
-for Python, or debugging. With arguments it runs them instead, e.g.
-`matlab-shell mex hello.c`.
+`matlab-shell` (the `shell` app) is a bash shell in the same environment. It sets
+`MATLAB_ROOT` and puts the MATLAB `bin` directory on `PATH`. Use it for `mex`, `mlint`,
+the MATLAB Engine for Python, or debugging. With arguments, it runs them instead of a
+shell, for example `matlab-shell mex hello.c`.
 
 ## NixOS and Home Manager modules
 
-`nixosModules.default` (for every user) and `homeModules.default` (for one) both add
-`programs.matlab`, which installs `matlab`, `matlab-install`, `matlab-shell` and a
-"MATLAB R2026b" desktop entry. Importing a module does nothing until
-`programs.matlab.enable` is set.
+`nixosModules.default` installs MATLAB for all users. `homeModules.default` installs it
+for one user. The two modules add `programs.matlab`. This option installs `matlab`,
+`matlab-install`, `matlab-shell`, and a "MATLAB R2026b" desktop entry. A module does
+nothing until you set `programs.matlab.enable`.
 
-- `programs.matlab.installDir`: absolute path of the installation, instead of
-  `~/.local/share/matlab/R2026b` of whoever runs it. `MATLAB_ROOT` still takes precedence.
+- `programs.matlab.installDir`: the absolute path of the installation directory. The
+  default is `~/.local/share/matlab/R2026b` of the user that runs MATLAB. `MATLAB_ROOT`
+  overrides this option.
 - `programs.matlab.package`: replaces the package.
 
 ```nix
@@ -78,68 +86,77 @@ for Python, or debugging. With arguments it runs them instead, e.g.
 }
 ```
 
-With Home Manager, import `matlab.homeModules.default` in your home configuration and
+For Home Manager, import `matlab.homeModules.default` in your home configuration. Then
 set the same option there.
 
-The package is also available on its own, as `packages.x86_64-linux.matlab` or as
-`matlab` from `overlays.default`, e.g. for a project's dev shell. It's only the Nix
-code and the environment, so it doesn't need `allowUnfree`.
+You can also use the package without a module, as `packages.x86_64-linux.matlab` or as
+`matlab` from `overlays.default`. For example, you can add it to the dev shell of a
+project. The package holds only the Nix code and the environment. Thus it does not need
+`allowUnfree`.
 
 ## Known issues
 
-- **Crash on exit with glibc's allocator.** With glibc 2.43 and later (NixOS has 2.44),
-  closing the MATLAB desktop aborts with `free(): chunks in smallbin corrupted` and
-  hangs, leaving a `~/matlab_crash_dump.*`. The same happens on
+- **Crash on exit with the glibc allocator.** NixOS has glibc 2.44. With glibc 2.43 and
+  later, the MATLAB desktop aborts on exit with `free(): chunks in smallbin corrupted`.
+  Then it hangs, and it leaves a `~/matlab_crash_dump.*` file. The same crash occurs on
   [Ubuntu 26.04](https://www.mathworks.com/matlabcentral/discussions/general/887876-matlab-crash-on-ubuntu-26-04-free-chunks-in-smallbin-corrupted)
-  and [Fedora 44](https://www.mathworks.com/matlabcentral/answers/2183725-matlab-hangs-throws-c-errors-when-exitting-fedora-44),
-  which MathWorks doesn't support yet. `matlab` and `matlab-shell` therefore preload
-  tcmalloc (from gperftools) as MATLAB's allocator, which exits cleanly. Remove it once
-  MathWorks fixes the crash; it hides heap corruption in MATLAB rather than fixing it.
-  MATLAB's own `ld_shim` workaround for newer distros (selected from `/etc/os-release`,
-  so never on NixOS) was tried with NixOS's loader and didn't stop the crash.
-- **No desktop without a terminal.** MATLAB only opens its desktop by itself when it's
-  started from a terminal; otherwise it runs at the command line and exits at once.
-  The desktop entry passes `-desktop`; do the same when launching it from a script or
-  keybinding.
-- **The first start after installing asks you to sign in**, even after signing in to
-  the installer. That's online licensing; the login is kept in `~/.matlab`.
-- **`MathWorksServiceHost` stays running** after MATLAB exits (it's MathWorks' licensing
-  and update daemon, installed to `~/.MathWorks/ServiceHost`). When it's started by a
-  piped command, e.g. `matlab -batch … | tail`, it keeps the pipe open and the
-  command seems to hang after MATLAB is done. Use `-logfile` or redirect to a file.
-- The main menu once showed "Error while processing HTTP request. Retry limit reached:
-  Connection refused", with two MATLAB desktops running; it was gone after restarting
-  MATLAB.
+  and [Fedora 44](https://www.mathworks.com/matlabcentral/answers/2183725-matlab-hangs-throws-c-errors-when-exitting-fedora-44).
+  MathWorks does not support these distributions at this time.
 
-MATLAB runs on Wayland through XWayland; it was tested on niri (with
-xwayland-satellite).
+  Thus `matlab` and `matlab-shell` preload tcmalloc (from gperftools) as the MATLAB
+  allocator. With tcmalloc, MATLAB exits cleanly. This preload hides heap corruption in
+  MATLAB, but it does not fix it. Remove the preload when MathWorks fixes the crash.
 
-## Updating to a new release
+  MATLAB has its own `ld_shim` workaround for newer distributions. MATLAB selects a shim
+  from `/etc/os-release`, so it never selects one on NixOS. A test of the shim with the
+  NixOS loader did not stop the crash.
+- **No desktop without a terminal.** MATLAB opens its desktop automatically only when
+  you start it from a terminal. Without a terminal, it runs at the command line and
+  exits immediately. The desktop entry adds `-desktop`. Add `-desktop` when you start
+  MATLAB from a script or a keybinding.
+- **The first start after the installation asks you to sign in.** This occurs also
+  after you signed in to the installer, because MATLAB uses online licensing. MATLAB
+  keeps the login in `~/.matlab`.
+- **`MathWorksServiceHost` continues to run after MATLAB exits.** It is the MathWorks
+  licensing and update daemon, in `~/.MathWorks/ServiceHost`. A piped command can start
+  it, for example `matlab -batch … | tail`. Then the daemon keeps the pipe open, and the
+  command seems to hang after MATLAB stops. Use `-logfile`, or send the output to a file.
+- The main menu showed "Error while processing HTTP request. Retry limit reached:
+  Connection refused" one time, with two MATLAB desktops open. After a restart of
+  MATLAB, the error did not occur again.
 
-MATLAB releases install side by side, each in its own folder. For a new release, bump
-`release` in [matlab.nix](matlab.nix), compare [fhs-packages.nix](fhs-packages.nix)
-against the new `matlab-deps/<release>` list, and run the new installer.
+MATLAB runs on Wayland through XWayland. The tests used niri with xwayland-satellite.
+
+## Update to a new release
+
+Each MATLAB release installs in its own directory, next to the other releases. For a
+new release, do these steps:
+
+1. Change `release` in [matlab.nix](matlab.nix).
+2. Compare [fhs-packages.nix](fhs-packages.nix) with the new `matlab-deps/<release>`
+   list.
+3. Run the new installer.
 
 CI ([check.yml](.github/workflows/check.yml)) builds the package and runs
-`nix flake check`: the build, both modules' configuration, and formatting
-(`nix fmt`). MATLAB itself can't be
-installed there, so running it is only tested by hand.
+`nix flake check`. The checks cover the build, the configuration of the two modules,
+and the formatting (`nix fmt`). CI cannot install MATLAB. Thus only a manual test
+shows that MATLAB runs.
 
 ## Prior work
 
 - [doronbehar/nix-matlab](https://gitlab.com/doronbehar/nix-matlab) (archived): the
   most complete earlier flake, and the base of the
-  [NixOS wiki page](https://wiki.nixos.org/wiki/Matlab). It uses the same
-  approach, with a hand-maintained package list and the install folder set in
-  `~/.config/matlab/nix.sh`.
-- [jorsn/matlab-nix-imperative](https://github.com/jorsn/matlab-nix-imperative): a
-  `nix-shell` based FHS environment for an imperative install, configured with
-  `MATLAB_DIR`.
+  [NixOS wiki page](https://wiki.nixos.org/wiki/Matlab). It uses the same approach.
+  It has a package list that its author maintained by hand, and it reads the
+  installation directory from `~/.config/matlab/nix.sh`.
+- [jorsn/matlab-nix-imperative](https://github.com/jorsn/matlab-nix-imperative): an FHS
+  environment for `nix-shell`, for a MATLAB that you install yourself. `MATLAB_DIR`
+  sets the installation directory.
 - [MATLAB on NixOS](http://tilde.club/~if/blog/matlab.html): an FHS shell for the
-  installer, and the GUI segfault workarounds of that time.
+  installer, and workarounds for the GUI segmentation faults of that time.
 
-## License
+## Licence
 
-The Nix code in this repository is under the [MIT license](LICENSE.md). MATLAB is
-proprietary software by The MathWorks, Inc. under its own license terms; it is
-installed by you from MathWorks, not included or redistributed here.
+The Nix code in this repository is under the [MIT licence](LICENSE.md). MATLAB is
+proprietary software by The MathWorks, Inc., under its own licence terms. You install
+it from MathWorks. This repository does not include or redistribute it.
