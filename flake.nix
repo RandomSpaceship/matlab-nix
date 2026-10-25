@@ -1,0 +1,144 @@
+{
+  description = "MATLAB on NixOS (an FHS environment for an imperative install)";
+
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+  outputs =
+    { self, nixpkgs }:
+    let
+      systems = [ "x86_64-linux" ];
+      forAllSystems =
+        f:
+        nixpkgs.lib.genAttrs systems (
+          system:
+          f (
+            import nixpkgs {
+              inherit system;
+              overlays = [ self.overlays.default ];
+            }
+          )
+        );
+    in
+    {
+      overlays.default = final: prev: {
+        matlab = final.callPackage ./matlab.nix { };
+      };
+
+      formatter = forAllSystems (pkgs: pkgs.nixfmt-tree);
+
+      packages = forAllSystems (pkgs: {
+        inherit (pkgs) matlab;
+        default = pkgs.matlab;
+      });
+
+      apps = forAllSystems (
+        pkgs:
+        let
+          inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) matlab;
+        in
+        {
+          default = {
+            type = "app";
+            program = "${matlab}/bin/matlab";
+          };
+          #   nix run .#install -- matlab_R2026b_Linux.zip
+          install = {
+            type = "app";
+            program = "${matlab}/bin/matlab-install";
+          };
+          shell = {
+            type = "app";
+            program = "${matlab}/bin/matlab-shell";
+          };
+        }
+      );
+
+      # MATLAB itself can't be installed in the sandbox (it needs a MathWorks
+      # login), so these only cover the environment and the launchers.
+      checks = forAllSystems (
+        pkgs:
+        let
+          inherit (pkgs.stdenv.hostPlatform) system;
+          inherit (self.packages.${system}) matlab;
+          inherit (nixpkgs) lib;
+
+          settings = {
+            programs.matlab = {
+              enable = true;
+              installDir = "/opt/MATLAB/R2026b";
+            };
+          };
+
+          # A minimal system with the module enabled, evaluated (not built).
+          nixos =
+            (lib.nixosSystem {
+              modules = [
+                self.nixosModules.default
+                settings
+                {
+                  nixpkgs.hostPlatform = system;
+                  boot.loader.grub.enable = false;
+                  fileSystems."/" = {
+                    device = "none";
+                    fsType = "tmpfs";
+                  };
+                  system.stateVersion = "26.05";
+                }
+              ];
+            }).config;
+
+          # The Home Manager module, with a stand-in for the one option it sets
+          # (so that this flake doesn't need Home Manager as an input).
+          home =
+            (lib.evalModules {
+              specialArgs = { inherit pkgs; };
+              modules = [
+                self.homeModules.default
+                settings
+                {
+                  options.home.packages = lib.mkOption {
+                    type = lib.types.listOf lib.types.package;
+                    default = [ ];
+                  };
+                }
+              ];
+            }).config;
+
+          installedMatlab =
+            packages: lib.findFirst (p: p.pname or null == "matlab") (throw "matlab not installed") packages;
+        in
+        {
+          inherit matlab;
+
+          module =
+            assert (installedMatlab nixos.environment.systemPackages).installDir == "/opt/MATLAB/R2026b";
+            assert (installedMatlab home.home.packages).installDir == "/opt/MATLAB/R2026b";
+            pkgs.writeText "check-module" "ok";
+
+          format = pkgs.runCommand "check-format" { nativeBuildInputs = [ pkgs.nixfmt ]; } ''
+            nixfmt --check ${./.}/*.nix
+            touch $out
+          '';
+        }
+      );
+
+      # programs.matlab.enable installs the launchers (`matlab`,
+      # `matlab-install`, `matlab-shell` and a desktop entry), for every user
+      # (NixOS) or for one (Home Manager). MATLAB itself is still installed
+      # with `matlab-install`.
+      nixosModules.default = import ./module.nix {
+        inherit self;
+        packagesOption = [
+          "environment"
+          "systemPackages"
+        ];
+      };
+      homeModules.default = import ./module.nix {
+        inherit self;
+        packagesOption = [
+          "home"
+          "packages"
+        ];
+      };
+    };
+}
