@@ -121,6 +121,27 @@ project. The package holds only the Nix code and the environment. Thus it does n
   licensing and update daemon, in `~/.MathWorks/ServiceHost`. A piped command can start
   it, for example `matlab -batch … | tail`. Then the daemon keeps the pipe open, and the
   command seems to hang after MATLAB stops. Use `-logfile`, or send the output to a file.
+- **`MathWorksServiceHost` changes the desktop configuration.** When the daemon
+  installs or updates itself, it adds an autostart entry to `~/.config/autostart`. It
+  also adds handlers for `mw-matlab:` and two other URL schemes to
+  `~/.local/share/applications/mimeapps.list`. If Home Manager manages default
+  applications (`xdg.mimeApps.enable`), that file is a symlink. The daemon replaces it
+  with a regular file, and the next Home Manager activation fails.
+
+  Thus the environment puts a temporary overlay on these two directories. MATLAB can
+  read the files in them, but its changes do not get to your home directory. As a
+  result, `mw-matlab:` links (for example from MATLAB Online) do not open MATLAB.
+
+  If you ran MATLAB without this overlay, remove the files that the daemon wrote:
+
+  ```sh
+  rm ~/.local/share/applications/mw-{matlab,simulink,matlabconnector}.desktop \
+    ~/.config/autostart/mathworks-service-host.desktop
+  ```
+
+  Then remove the `x-scheme-handler/mw-*` lines from `mimeapps.list`. If Home Manager
+  manages the file, delete it and run the switch again. Also delete
+  `mimeapps.list.bak` if Home Manager cannot make a backup.
 - The main menu showed "Error while processing HTTP request. Retry limit reached:
   Connection refused" one time, with two MATLAB desktops open. After a restart of
   MATLAB, the error did not occur again.

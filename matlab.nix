@@ -39,12 +39,30 @@ let
     export LD_PRELOAD="${gperftools}/lib/libtcmalloc_minimal.so.4''${LD_PRELOAD:+:$LD_PRELOAD}"
   '';
 
+  # MathWorksServiceHost (started by MATLAB, and still running in the
+  # environment after it exits) registers itself in these directories: an
+  # autostart entry, and mw-matlab: etc. URL handlers that it adds to
+  # mimeapps.list. That replaces a mimeapps.list symlink from Home Manager and
+  # breaks the next activation. In the environment they are overlays whose
+  # changes are discarded. (bwrap can't mount on the symlink itself.)
+  hiddenDirs = [
+    "$HOME/.config/autostart"
+    "$HOME/.local/share/applications"
+  ];
+
   env = buildFHSEnv {
     name = "matlab-env";
     targetPkgs = import ./fhs-packages.nix;
     profile = ''
       export LANG="''${LANG:-en_US.UTF-8}"
     '';
+    extraPreBwrapCmds = ''
+      mkdir -p ${lib.concatStringsSep " " (map (dir: "\"${dir}\"") hiddenDirs)}
+    '';
+    extraBwrapArgs = lib.concatMap (dir: [
+      "--overlay-src \"${dir}\""
+      "--tmp-overlay \"${dir}\""
+    ]) hiddenDirs;
     # Runs its arguments, or an interactive bash without any.
     runScript = writeShellScript "matlab-env-run" ''
       if [ $# -eq 0 ]; then
