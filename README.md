@@ -87,6 +87,16 @@ code and the environment, so it doesn't need `allowUnfree`.
 
 ## Known issues
 
+- **Crash on exit with glibc's allocator.** With glibc 2.43 and later (NixOS has 2.44),
+  closing the MATLAB desktop aborts with `free(): chunks in smallbin corrupted` and
+  hangs, leaving a `~/matlab_crash_dump.*`. The same happens on
+  [Ubuntu 26.04](https://www.mathworks.com/matlabcentral/discussions/general/887876-matlab-crash-on-ubuntu-26-04-free-chunks-in-smallbin-corrupted)
+  and [Fedora 44](https://www.mathworks.com/matlabcentral/answers/2183725-matlab-hangs-throws-c-errors-when-exitting-fedora-44),
+  which MathWorks doesn't support yet. `matlab` and `matlab-shell` therefore preload
+  tcmalloc (from gperftools) as MATLAB's allocator, which exits cleanly. Remove it once
+  MathWorks fixes the crash; it hides heap corruption in MATLAB rather than fixing it.
+  MATLAB's own `ld_shim` workaround for newer distros (selected from `/etc/os-release`,
+  so never on NixOS) was tried with NixOS's loader and didn't stop the crash.
 - **No desktop without a terminal.** MATLAB only opens its desktop by itself when it's
   started from a terminal; otherwise it runs at the command line and exits at once.
   The desktop entry passes `-desktop`; do the same when launching it from a script or

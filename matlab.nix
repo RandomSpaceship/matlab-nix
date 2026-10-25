@@ -6,6 +6,7 @@
   symlinkJoin,
   makeDesktopItem,
   unzip,
+  gperftools,
   # The installation directory, instead of ~/.local/share/matlab/<release>.
   installDir ? null,
 }:
@@ -29,6 +30,13 @@ let
     if [ -z "$root" ]; then
       root=${defaultRoot}
     fi
+  '';
+
+  # With glibc 2.43 and later, MATLAB's desktop aborts while exiting ("free():
+  # chunks in smallbin corrupted", as on Ubuntu 26.04 and Fedora 44) and then
+  # hangs; with tcmalloc as the allocator it exits cleanly.
+  preloadTcmalloc = ''
+    export LD_PRELOAD="${gperftools}/lib/libtcmalloc_minimal.so.4''${LD_PRELOAD:+:$LD_PRELOAD}"
   '';
 
   env = buildFHSEnv {
@@ -62,6 +70,7 @@ let
         ln -sf "$root/bin/glnxa64/cef_resources/matlab_icon.png" "$icon"
       fi
 
+      ${preloadTcmalloc}
       exec ${env}/bin/matlab-env "$root/bin/matlab" "$@"
     '';
   };
@@ -122,6 +131,7 @@ let
     text = findRoot + ''
       export MATLAB_ROOT="$root"
       export PATH="$root/bin:$PATH"
+      ${preloadTcmalloc}
       exec ${env}/bin/matlab-env "$@"
     '';
   };
