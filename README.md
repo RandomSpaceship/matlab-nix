@@ -80,7 +80,10 @@ Without the modules, use `matlab.packages.x86_64-linux.matlab.override { release
 
 ```nix
 {
-  inputs.matlab.url = "github:RandomSpaceship/matlab-nix";
+  inputs.matlab = {
+    url = "github:RandomSpaceship/matlab-nix";
+    inputs.nixpkgs.follows = "nixpkgs";
+  };
 
   outputs = { nixpkgs, matlab, ... }: {
     nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
@@ -95,6 +98,14 @@ Without the modules, use `matlab.packages.x86_64-linux.matlab.override { release
 
 For Home Manager, import `matlab.homeModules.default` in your home configuration. Then
 set the same option there.
+
+The modules build the package from the nixpkgs of your system, not from the `nixpkgs`
+input of this flake. Thus the environment uses the same libraries as your system.
+`inputs.nixpkgs.follows` is not necessary for this, but it stops Nix from getting a
+second nixpkgs for the input. CI tests only the nixpkgs version in `flake.lock` of this
+flake (nixos-unstable). With a different nixpkgs, for example a stable release, a
+package in the dependency list can be missing. Also, the glibc version can be different
+from the version in [Known issues](#known-issues).
 
 You can also use the package without a module, as `packages.x86_64-linux.matlab` or as
 `matlab` from `overlays.default`. For example, you can add it to the dev shell of a

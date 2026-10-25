@@ -1,6 +1,6 @@
 # The NixOS and Home Manager modules, which differ only in the option the
 # package is added to.
-{ self, packagesOption }:
+{ packagesOption }:
 
 {
   config,
@@ -18,8 +18,9 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      default = self.packages.${pkgs.stdenv.hostPlatform.system}.matlab;
-      defaultText = lib.literalExpression "matlab.packages.\${pkgs.stdenv.hostPlatform.system}.matlab";
+      # Built from the system's nixpkgs, not the nixpkgs input of this flake.
+      default = pkgs.callPackage ./matlab.nix { };
+      defaultText = lib.literalExpression "pkgs.callPackage ./matlab.nix { }";
       description = "The MATLAB package (the launchers; MATLAB itself is installed with `matlab-install`).";
     };
 

@@ -165,14 +165,12 @@
       # (NixOS) or for one (Home Manager). MATLAB itself is still installed
       # with `matlab-install`.
       nixosModules.default = import ./module.nix {
-        inherit self;
         packagesOption = [
           "environment"
           "systemPackages"
         ];
       };
       homeModules.default = import ./module.nix {
-        inherit self;
         packagesOption = [
           "home"
           "packages"
